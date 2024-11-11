@@ -169,9 +169,28 @@ def prepare_lstm_data(data, look_back=60):
     return X, y, scaler
 
 # LSTM Model
+# def lstm_model(train_data, test_data, look_back=60, epochs=10, batch_size=32):
+#     X_train, y_train, scaler = prepare_lstm_data(train_data, look_back)
+#     X_test, y_test, _ = prepare_lstm_data(test_data, look_back)
+    
+#     model = Sequential()
+#     model.add(LSTM(units=50, return_sequences=True, input_shape=(X_train.shape[1], 1)))
+#     model.add(LSTM(units=50, return_sequences=False))
+#     model.add(Dense(units=1))
+#     model.compile(optimizer='adam', loss='mean_squared_error')
+    
+#     model.fit(X_train, y_train, epochs=epochs, batch_size=batch_size, verbose=1)
+    
+#     lstm_predictions = scaler.inverse_transform(model.predict(X_test))
+#     y_test_actual = scaler.inverse_transform(y_test.reshape(-1, 1))
+    
+#     mae_lstm = mean_absolute_error(y_test_actual, lstm_predictions)
+#     rmse_lstm = np.sqrt(mean_squared_error(y_test_actual, lstm_predictions))
+#     mape_lstm = np.mean(np.abs((y_test_actual - lstm_predictions) / y_test_actual)) * 100
+
+#     return mae_lstm, rmse_lstm, mape_lstm
 def lstm_model(train_data, test_data, look_back=60, epochs=10, batch_size=32):
     X_train, y_train, scaler = prepare_lstm_data(train_data, look_back)
-    X_test, y_test, _ = prepare_lstm_data(test_data, look_back)
     
     model = Sequential()
     model.add(LSTM(units=50, return_sequences=True, input_shape=(X_train.shape[1], 1)))
@@ -181,11 +200,83 @@ def lstm_model(train_data, test_data, look_back=60, epochs=10, batch_size=32):
     
     model.fit(X_train, y_train, epochs=epochs, batch_size=batch_size, verbose=1)
     
-    lstm_predictions = scaler.inverse_transform(model.predict(X_test))
-    y_test_actual = scaler.inverse_transform(y_test.reshape(-1, 1))
-    
-    mae_lstm = mean_absolute_error(y_test_actual, lstm_predictions)
-    rmse_lstm = np.sqrt(mean_squared_error(y_test_actual, lstm_predictions))
-    mape_lstm = np.mean(np.abs((y_test_actual - lstm_predictions) / y_test_actual)) * 100
+    # Return only the model and scaler
+    return model, scaler
 
-    return mae_lstm, rmse_lstm, mape_lstm
+def forecast_arima(train_data, forecast_period=180, order=(5, 1, 0)):
+    model = ARIMA(train_data, order=order)
+    fitted_model = model.fit()
+    forecast = fitted_model.get_forecast(steps=forecast_period)
+    forecast_values = forecast.predicted_mean
+    confidence_intervals = forecast.conf_int()
+    return forecast_values, confidence_intervals
+def forecast_sarima(train_data, forecast_period=180, order=(1, 1, 1), seasonal_order=(1, 1, 1, 12)):
+    model = SARIMAX(train_data, order=order, seasonal_order=seasonal_order)
+    fitted_model = model.fit()
+    forecast = fitted_model.get_forecast(steps=forecast_period)
+    forecast_values = forecast.predicted_mean
+    confidence_intervals = forecast.conf_int()
+    return forecast_values, confidence_intervals
+def forecast_lstm(model, data, scaler, look_back=60, forecast_period=180):
+    # Prepare initial input for forecast generation
+    inputs = data[-look_back:].values.reshape(-1, 1)
+    inputs = scaler.transform(inputs)
+    forecast_values = []
+
+    for _ in range(forecast_period):
+        X_input = np.array(inputs[-look_back:]).reshape(1, look_back, 1)
+        predicted_value = model.predict(X_input)
+        forecast_values.append(predicted_value[0, 0])
+        inputs = np.append(inputs, predicted_value)[-look_back:]
+
+    # Inverse scale the forecast values
+    forecast_values = scaler.inverse_transform(np.array(forecast_values).reshape(-1, 1)).flatten()
+    
+    return forecast_values
+
+def forecast_and_analyze(train_data, model_type="arima", forecast_period=180):
+    if model_type.lower() == "arima":
+        forecast_values, confidence_intervals = forecast_arima(train_data, forecast_period)
+    elif model_type.lower() == "sarima":
+        forecast_values, confidence_intervals = forecast_sarima(train_data, forecast_period)
+    elif model_type.lower() == "lstm":
+        model, scaler = lstm_model(train_data, train_data)
+        forecast_values = forecast_lstm(model, train_data, scaler, forecast_period=forecast_period)
+        confidence_intervals = None
+
+    # Plotting and Analysis
+    plt.figure(figsize=(12, 6))
+    train_data.plot(label='Historical Data')
+    
+    forecast_index = pd.date_range(start=train_data.index[-1] + pd.Timedelta(days=1), periods=forecast_period)
+    forecast_series = pd.Series(forecast_values, index=forecast_index)
+    forecast_series.plot(label=f'{model_type.upper()} Forecast', color='orange')
+
+    if confidence_intervals is not None:
+        plt.fill_between(forecast_index, 
+                         confidence_intervals.iloc[:, 0], 
+                         confidence_intervals.iloc[:, 1], 
+                         color='pink', alpha=0.3)
+
+    plt.title(f'{model_type.upper()} Forecast for Tesla Stock Prices')
+    plt.xlabel('Date')
+    plt.ylabel('Price')
+    plt.legend()
+    plt.show()
+
+    # Analysis
+    print("Trend Analysis:")
+    trend_direction = "upward" if forecast_values[-1] > forecast_values[0] else "downward"
+    print(f"The trend over the forecast period is {trend_direction}.")
+
+    print("\nVolatility and Risk Analysis:")
+    if confidence_intervals is not None:
+        print("The forecast includes confidence intervals, indicating expected price fluctuation ranges.")
+    else:
+        print("Confidence intervals are unavailable for the LSTM model.")
+    
+    print("\nMarket Opportunities and Risks:")
+    if trend_direction == "upward":
+        print("Potential market opportunity due to an expected price increase.")
+    else:
+        print("Potential market risk due to an expected price decrease.")
