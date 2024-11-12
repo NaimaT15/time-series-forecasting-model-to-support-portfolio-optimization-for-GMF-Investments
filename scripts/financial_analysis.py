@@ -168,27 +168,7 @@ def prepare_lstm_data(data, look_back=60):
     
     return X, y, scaler
 
-# LSTM Model
-# def lstm_model(train_data, test_data, look_back=60, epochs=10, batch_size=32):
-#     X_train, y_train, scaler = prepare_lstm_data(train_data, look_back)
-#     X_test, y_test, _ = prepare_lstm_data(test_data, look_back)
-    
-#     model = Sequential()
-#     model.add(LSTM(units=50, return_sequences=True, input_shape=(X_train.shape[1], 1)))
-#     model.add(LSTM(units=50, return_sequences=False))
-#     model.add(Dense(units=1))
-#     model.compile(optimizer='adam', loss='mean_squared_error')
-    
-#     model.fit(X_train, y_train, epochs=epochs, batch_size=batch_size, verbose=1)
-    
-#     lstm_predictions = scaler.inverse_transform(model.predict(X_test))
-#     y_test_actual = scaler.inverse_transform(y_test.reshape(-1, 1))
-    
-#     mae_lstm = mean_absolute_error(y_test_actual, lstm_predictions)
-#     rmse_lstm = np.sqrt(mean_squared_error(y_test_actual, lstm_predictions))
-#     mape_lstm = np.mean(np.abs((y_test_actual - lstm_predictions) / y_test_actual)) * 100
 
-#     return mae_lstm, rmse_lstm, mape_lstm
 def lstm_model(train_data, test_data, look_back=60, epochs=10, batch_size=32):
     X_train, y_train, scaler = prepare_lstm_data(train_data, look_back)
     
