@@ -234,7 +234,7 @@ def forecast_lstm(model, data, scaler, look_back=60, forecast_period=180):
     
     return forecast_values
 
-def forecast_and_analyze(train_data, model_type="arima", forecast_period=180):
+def forecast_and_analyze(train_data, model_type="arima", forecast_period=180, asset_name="Asset"):
     if model_type.lower() == "arima":
         forecast_values, confidence_intervals = forecast_arima(train_data, forecast_period)
     elif model_type.lower() == "sarima":
@@ -258,7 +258,8 @@ def forecast_and_analyze(train_data, model_type="arima", forecast_period=180):
                          confidence_intervals.iloc[:, 1], 
                          color='pink', alpha=0.3)
 
-    plt.title(f'{model_type.upper()} Forecast for Tesla Stock Prices')
+    # Use asset_name to customize the title
+    plt.title(f'{model_type.upper()} Forecast for {asset_name} Stock Prices')
     plt.xlabel('Date')
     plt.ylabel('Price')
     plt.legend()
@@ -280,3 +281,6 @@ def forecast_and_analyze(train_data, model_type="arima", forecast_period=180):
         print("Potential market opportunity due to an expected price increase.")
     else:
         print("Potential market risk due to an expected price decrease.")
+
+    # Return forecast and confidence intervals for further analysis
+    return {"forecast": forecast_series, "confidence_intervals": confidence_intervals}
